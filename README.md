@@ -25,7 +25,7 @@ All of the data_loader scripts refer to the files in the model-tables folder.  T
 *On the SQL side (load_sql, load_gcp, load_spanner)* -  Each of the hierchical elements would be cast into a separate table.  This will create a claim table, claim_claimLine, claim_claimLine_payment and claim_claimLine_diagnosisCodes.  The scripts automatically add foreign key relationships.
 
 ### *Operation*
-The scipt is controlled by data in the relations_settings.json file, here you can specify groups of dependent csv templates, each with its own set of ratios.  A typical invokation would be:
+The scipt is controlled by data in the relations_settings.json file, here you can specify groups of dependent csv templates, each with its own set of ratios.  A typical invocation would be:
 
 `python3 load_sql_spanner.py action=load_data`
 
