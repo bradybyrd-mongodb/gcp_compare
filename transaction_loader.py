@@ -65,28 +65,6 @@ def sql_execute(sql):
         print(f"{sql} - {err}")
     cur.close()
 
-
-def get_claims_redis(r, key):
-    try:
-        r_data = r.get(key)
-        if r_data is not None:
-            r_data = json.loads(r_data)
-        return r_data
-    except Exception as error:
-        logging.error(f" {error}")
-
-
-def load_claims_redis(r, key, data):
-    try:
-        load_state = r.set(key, json.dumps(data, default=dumps))
-        logging.debug(f"loaded to redis status {load_state}")
-        if load_state is True:
-            logging.debug(f"claim loaded to redis for claim {key}")
-        return load_state
-    except Exception as error:
-        logging.error(f" {error}")
-
-
 def get_claims_sql(conn, query, patient_id, r, skip_cache, iters = 1):
     start = datetime.datetime.now()
     SQL = ""
@@ -94,52 +72,38 @@ def get_claims_sql(conn, query, patient_id, r, skip_cache, iters = 1):
     increment = 1
     if "inc" in ARGS:
         increment = int(ARGS["inc"])
-    cache_hit = False
     pair = patient_id.split("-")
     idnum = int(pair[1])
     for inc in range(iters):
         patient_id = f'{pair[0]}-{idnum}'
         instart = datetime.datetime.now()
-        if not skip_cache:
-            key = query + ":" + patient_id
-            query_result = get_claims_redis(r, key)
-            if query_result is not None:
-                logging.debug(f"cache hit -> {patient_id}")
-                print(query_result)
-                cache_hit = True
-            else:
-                logging.debug(f"cache miss -> {patient_id}")
-                logging.debug(f"fetching from psql {SQL}")
-        if not cache_hit:            
-            if query == "claim":  # Claim - only
-                SQL = "select *  from claim c where c.patient_id ='{}'".format(str(patient_id))
-            elif query == "claimLinePayments":  # Claim + Claimlines + Claimpayments
-                SQL = "select c.*, cl.*, cp.* from claim c LEFT JOIN claim_payment cp on cp.claim_id = c.claim_id LEFT OUTER JOIN claim_claimline cl on cl.claim_id = c.claim_id where c.patient_id = '{}'".format(
-                    str(patient_id)
-                )
-                # Claim + Member + Provider (and a bunch of the sub tables)
-            elif query == "claimMemberProvider":
-                SQL = """select c.*, m.firstname, m.lastname, m.dateofbirth, m.gender, cl.*, cp.paidamount, cp.paiddate, ap.firstname as ap_first, ap.lastname as ap_last, ap.gender as ap_gender, ap.dateofbirth as ap_birthdate,
-                                op.firstname as op_first, op.lastname as op_last, op.gender as op_gender, op.dateofbirth as op_birthdate,
-                                rp.firstname as rp_first, rp.lastname as rp_last, rp.gender as rp_gender, rp.dateofbirth as rp_birthdate,
-                                opp.firstname as opp_first, opp.lastname as opp_last, opp.gender as opp_gender, opp.dateofbirth as opp_birthdate, ma.city as city, ma.state as us_state,
-                                mc.phonenumber as phone, mc.emailaddress as email
-                                from claim c
-                                INNER JOIN member m on m.member_id = c.patient_id
-                                LEFT OUTER JOIN claim_claimline cl on cl.claim_id = c.claim_id
-                                LEFT JOIN claim_payment cp on cp.claim_id = c.claim_id
-                                INNER JOIN provider ap on cl.attendingprovider_id = ap.provider_id
-                                INNER JOIN provider op on cl.orderingprovider_id = op.provider_id
-                                INNER JOIN provider rp on cl.referringprovider_id = rp.provider_id
-                                INNER JOIN provider opp on cl.operatingprovider_id = opp.provider_id
-                                LEFT JOIN (select * from member_address where type = 'Main' limit 1) ma on ma.member_id = m.member_id
-                                INNER JOIN (select * from member_communication where emailtype = 'Work' and member_id = '{}' limit 1) mc on mc.member_id = m.member_id
-                                where c.patient_id = '{}' """.format(
-                                                    str(patient_id), str(patient_id)
-                )
+        if query == "claim":  # Claim - only
+            SQL = "select *  from claim c where c.patient_id ='{}'".format(str(patient_id))
+        elif query == "claimLinePayments":  # Claim + Claimlines + Claimpayments
+            SQL = "select c.*, cl.*, cp.* from claim c LEFT JOIN claim_payment cp on cp.claim_id = c.claim_id LEFT OUTER JOIN claim_claimline cl on cl.claim_id = c.claim_id where c.patient_id = '{}'".format(
+                str(patient_id)
+            )
+            # Claim + Member + Provider (and a bunch of the sub tables)
+        elif query == "claimMemberProvider":
+            SQL = """select c.*, m.firstname, m.lastname, m.dateofbirth, m.gender, cl.*, cp.paidamount, cp.paiddate, ap.firstname as ap_first, ap.lastname as ap_last, ap.gender as ap_gender, ap.dateofbirth as ap_birthdate,
+                op.firstname as op_first, op.lastname as op_last, op.gender as op_gender, op.dateofbirth as op_birthdate,
+                rp.firstname as rp_first, rp.lastname as rp_last, rp.gender as rp_gender, rp.dateofbirth as rp_birthdate,
+                opp.firstname as opp_first, opp.lastname as opp_last, opp.gender as opp_gender, opp.dateofbirth as opp_birthdate, ma.city as city, ma.state as us_state,
+                mc.phonenumber as phone, mc.emailaddress as email
+                from claim c
+                INNER JOIN member m on m.member_id = c.patient_id
+                LEFT OUTER JOIN claim_claimline cl on cl.claim_id = c.claim_id
+                LEFT JOIN claim_payment cp on cp.claim_id = c.claim_id
+                INNER JOIN provider ap on cl.attendingprovider_id = ap.provider_id
+                INNER JOIN provider op on cl.orderingprovider_id = op.provider_id
+                INNER JOIN provider rp on cl.referringprovider_id = rp.provider_id
+                INNER JOIN provider opp on cl.operatingprovider_id = opp.provider_id
+                LEFT JOIN (select * from member_address where type = 'Main' limit 1) ma on ma.member_id = m.member_id
+                INNER JOIN (select * from member_communication where emailtype = 'Work' and member_id = '{}' limit 1) mc on mc.member_id = m.member_id
+                where c.patient_id = '{}' """.format(
+                                    str(patient_id), str(patient_id)
+            )
             query_result = sql_query(SQL, conn)
-            if not skip_cache:
-                load_claims_redis(r, key, query_result)
             #num_results = query_result["num_records"]
             #logging.debug(f"found {num_results} records")
             cnt = 0
@@ -271,7 +235,7 @@ def transaction_mongodb(client, num_payment, manual=False):
 # add mongodb query performance
 
 
-def transaction_postgres(conn, num_payment):
+def transaction_sql(conn, num_payment):
     payment = generate_payments(num_payment)
     conn.autocommit = False #for multi-line transactions
     cur = conn.cursor()
@@ -665,23 +629,6 @@ def spanner_connection(type="spanner", sdb="none"):
     client = spanner.Client()
     return client
 
-def pg_connection(type="postgres", sdb="none"):
-    shost = settings[type]["host"]
-    susername = settings[type]["username"]
-    spwd = settings[type]["password"]
-    if "secret" in spwd:
-        spwd = os.environ.get("_PGPWD_")
-    if sdb == "none":
-        sdb = settings[type]["database"]
-    conn = psycopg2.connect(host=shost, database=sdb,
-                            user=susername, password=spwd)
-    return conn
-
-def redis_connection(type="redis_local"):
-    rhost = settings[type]["host"]
-    #r = redis.Redis(host=rhost, port=6379, db=0)
-    return r
-
 def mongodb_connection(type="uri", details={}):
     mdb_conn = settings[type]
     username = settings["username"]
@@ -702,22 +649,8 @@ def mongodb_connection(type="uri", details={}):
     return client
 
 def sql_query(sql, conn):
-    return postgres_query(conn,sql) if platform == "postgres" else spanner_query(conn,sql)
-        
-
-def postgres_query(conn, sql):
-    cur = conn.cursor()
-    try:
-        cur.execute(sql)
-        row_count = cur.rowcount
-        #print(f"{row_count} records")
-        rows = cur.fetchall()
-        result = {"num_records": row_count, "data": rows}
-        return result
-    except psycopg2.DatabaseError as err:
-        print(f"{sql} - {err}")
-    cur.close()
-
+    return spanner_query(conn,sql)
+    
 def spanner_query(conn, sql):
     # Queries sample data from spanner using SQL.
     instance_id = settings["spanner"]["instance_id"]

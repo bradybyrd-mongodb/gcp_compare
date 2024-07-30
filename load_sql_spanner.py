@@ -476,14 +476,23 @@ def claimline_vw():
 def member_api():
     # show a single member and recent claims
     # include the primary provider
+    instart = datetime.datetime.now()
     d_member = {}
-    sql = "select m.*, p.nationalprovideridentifier, p.firstname, p.lastname, p.dateofbirth, p.gender from member m INNER JOIN provider p on p.provider_id = m.primaryprovider_id;"  # INNER JOIN providers p on m.primaryProvider_id = p.provider_id"
+    sql = "select m.*, p.nationalprovideridentifier, p.firstname, p.lastname, p.dateofbirth, p.gender from member m INNER JOIN provider p on p.provider_id = m.primaryprovider_id limit 10;"  # INNER JOIN providers p on m.primaryProvider_id = p.provider_id"
     result = sql_query("healthcare", sql)
-    k = 0
-    for item in result:
-        if k < 20:
-            pprint.pprint(item)
-        k += 1
+    #num_results = query_result["num_records"]
+    #logging.debug(f"found {num_results} records")
+    sample = {}
+    cnt = 0
+    for data in result["data"]:
+        # print(result)
+        cnt += 1
+        sample = data
+    timer(instart, cnt)
+    bb.logit(f'SQL = {sql}')
+    bb.logit("Sample Record:")
+    pprint.pprint(sample)
+    
 
 
 def get_claims(conn=""):
@@ -646,13 +655,28 @@ def sql_query(database, sql, nconn=False):
     if not nconn:
         nconn = spanner_connection()
     try:
-        nconn.execute(sql)
-        bb.logit(f"{cur.rowcount} records")
+        result = spanner_query(nconn, sql)
     except Exception as err:
         bb.logit(f"{sql} - {err}")
-    result = nconn.fetchall()
     if nconn:
         nconn.close()
+    return result
+
+def spanner_query(conn, sql):
+    # Queries sample data from spanner using SQL.
+    instance_id = settings["spanner"]["instance_id"]
+    database_id = settings["spanner"]["database_id"]
+    instance = conn.instance(instance_id)
+    database = instance.database(database_id)
+    result = {"num_records": 0, "data": []}
+    with database.snapshot() as snapshot:
+        results = snapshot.execute_sql(
+            sql
+        )
+        #for row in results:
+            #print("SingerId: {}, AlbumId: {}, AlbumTitle: {}".format(*row))
+        #print(sql)
+        result = {"num_records": 0, "data": results}    
     return result
 
 
@@ -858,6 +882,21 @@ def spanner_create_database(sp_client, db_name):
 
     bb.logit("DDL - complete")
 
+def timer(starttime,cnt = 1, ttype = "sub"):
+    elapsed = datetime.datetime.now() - starttime
+    secs = elapsed.seconds
+    msecs = elapsed.microseconds
+    if secs == 0:
+        elapsed = msecs * .001
+        unit = "ms"
+    else:
+        elapsed = secs + (msecs * .000001)
+        unit = "s"
+    if ttype == "sub":
+        bb.logit(f"query ({cnt} recs) took: {'{:.3f}'.format(elapsed)} {unit}")
+    else:
+        bb.logit(f"# --- Complete: query took: {'{:.3f}'.format(elapsed)} {unit} ---- #")
+        bb.logit(f"#   {cnt} items {'{:.3f}'.format((elapsed)/cnt)} {unit} avg")
 
 # ------------------------------------------------------------------#
 #     MAIN
