@@ -54,4 +54,13 @@ This will perform ddl actions:
 
 This will create the tables in the quote system.  A task of drop drops, delete deletes etc.
 
-For security, the script looks for environment variables __PWD__ as passwords as well as the OOGLE_APPLICATION_CREDENTIALS to get you into the GCP environment.
+For security, the script looks for environment variables __PWD__ as passwords as well as the GOOGLE_APPLICATION_CREDENTIALS to get you into the GCP environment.
+
+### Testing Spanner Performance
+The transaction_loader.py script will take an argument of a sample id and increment it a number of times to test query performance.  Here are some examples:
+
+`python3 transaction_loader.py action=get_claims_mongodb query=claim patient_id=M-2009050 iters=10 inc=10`
+`python3 transaction_loader.py action=get_claims_mongodb query=claimMemberProvider patient_id=M-2009050 iters=10 inc=10`
+`python3 transaction_loader.py action=get_claims_sql query=claim patient_id=M-2016016 iters=10 inc=10 `
+`python3 transaction_loader.py action=get_claims_sql query=claimLinePayments patient_id=M-2016016 iters=10 inc=10`
+`python3 transaction_loader.py action=get_claims_sql query=claimMemberProvider patient_id=M-2016016 iters=10 inc=10`

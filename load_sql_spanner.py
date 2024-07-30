@@ -643,14 +643,15 @@ def record_loader(tables, table, recs, nconn=False):
 
 def sql_query(database, sql, nconn=False):
     # insert_into table fields () values ();
-
+    if not nconn:
+        nconn = spanner_connection()
     try:
         nconn.execute(sql)
         bb.logit(f"{cur.rowcount} records")
     except Exception as err:
         bb.logit(f"{sql} - {err}")
     result = nconn.fetchall()
-    if not nconn:
+    if nconn:
         nconn.close()
     return result
 
@@ -901,10 +902,6 @@ if __name__ == "__main__":
         template = ARGS["template"]
         domain = "bugsy"
         ddl_from_template(action, pgconn, template, domain)
-    elif ARGS["action"] == "fix_providers":
-        add_primary_provider_ids()
-    elif ARGS["action"] == "fix_guardians":
-        fix_member_guardian_ids()
     elif ARGS["action"] == "query_test":
         member_api()
     elif ARGS["action"] == "claim":
